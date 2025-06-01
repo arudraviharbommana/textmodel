@@ -1,0 +1,15 @@
+PyTorch Use in Simple Words:
+To load pre-trained models – Like T5 for summarization and DistilBERT for question answering. These models are built using PyTorch.
+
+To move models to GPU or CPU – PyTorch helps check if GPU is available (cuda) and moves the models to it for faster performance.
+
+To convert text into tensors – PyTorch works with tensors (like number arrays), so we convert input text into PyTorch tensors before giving it to the model.
+
+To do predictions (inference) – When we run the model to get a summary or an answer, PyTorch does the actual number crunching.
+
+To avoid extra calculations during prediction – torch.no_grad() is used to save memory and speed things up since we don’t need gradients during inference.
+
+To pick the best answer span – In question answering, PyTorch is used to find the position where the answer starts and ends using argmax().
+
+To slice tensors and extract tokens – After prediction, PyTorch helps extract the exact answer words from the output tensor.
+

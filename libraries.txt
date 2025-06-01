@@ -1,0 +1,11 @@
+import torch  # For using PyTorch models and running them on CPU/GPU
+from transformers import AutoTokenizer, AutoModelForSeq2SeqLM, AutoModelForQuestionAnswering, T5ForConditionalGeneration  
+# For loading pre-trained NLP models from Hugging Face
+import re  # For cleaning and formatting text using regular expressions
+import logging  # For logging errors and events during the app's execution
+import streamlit as st  # For building the web app interface
+from PIL import Image, ImageOps  # For opening and handling image files
+import pytesseract  # For extracting text from images using OCR
+import cv2  # For image processing tasks like resizing and thresholding
+import numpy as np  # For numerical operations on image arrays
+import tempfile  # For creating temporary files to process images
