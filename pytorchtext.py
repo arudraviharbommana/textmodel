@@ -2,16 +2,14 @@ import torch
 from transformers import (
     AutoTokenizer, 
     T5ForConditionalGeneration, 
-    pipeline
+    pipeline,
+    AutoModelForQuestionAnswering
 )
 import re
 import logging
 import streamlit as st
-from PIL import Image, ImageFilter, ImageOps
-import pytesseract
 import random
 import io
-import tempfile
 
 # Setup logging
 logging.basicConfig(level=logging.INFO)
@@ -31,9 +29,15 @@ try:
 except Exception:
     question_gen_pipeline = None
 
+# Question Answering model
+qa_model_name = "distilbert-base-cased-distilled-squad"
+qa_tokenizer = AutoTokenizer.from_pretrained(qa_model_name)
+qa_model = AutoModelForQuestionAnswering.from_pretrained(qa_model_name)
+
 # Device setup
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 sum_model.to(device)
+qa_model.to(device)
 
 # Utility functions
 def clean_text(text: str) -> str:
@@ -44,28 +48,33 @@ def clean_text(text: str) -> str:
 def summarize(text: str) -> str:
     try:
         input_text = "summarize: " + clean_text(text)
-        inputs = sum_tokenizer.encode(input_text, return_tensors="pt", max_length=512, truncation=True).to(device)
-        summary_ids = sum_model.generate(inputs, max_length=len(text.split()) // 2, min_length=40, length_penalty=2.0, num_beams=4, early_stopping=True)
-        return sum_tokenizer.decode(summary_ids[0], skip_special_tokens=True)
+        input_tokens = sum_tokenizer.encode(input_text, return_tensors="pt", max_length=1024, truncation=True).to(device)
+
+        # Calculate max and min length for summary (2/5 of input word count)
+        input_word_len = len(text.split())
+        max_length = max(50, int(input_word_len * 0.4))  # slightly less than 2/5 to allow model to output nicely
+        min_length = max(30, int(max_length * 0.9))  # ensure summary isn't too short
+        
+        # Generation with sampling for dynamic outputs
+        summary_ids = sum_model.generate(
+            input_tokens,
+            max_length=max_length,
+            min_length=min_length,
+            do_sample=True,
+            top_k=50,
+            top_p=0.95,
+            temperature=0.85,
+            num_return_sequences=1,
+            length_penalty=1.0,
+            early_stopping=True
+        )
+
+        summary = sum_tokenizer.decode(summary_ids[0], skip_special_tokens=True)
+        return summary
+
     except Exception as e:
         logger.warning(f"Summarization failed: {e}")
         return "Sorry, I couldn't generate a summary. Try providing a more detailed paragraph."
-
-def extract_text_from_image(image: Image.Image) -> str:
-    preprocessed = preprocess_image(image)
-    text = pytesseract.image_to_string(preprocessed)
-    return clean_text(text)
-
-def preprocess_image(image):
-    gray = image.convert("L")
-    gray = ImageOps.autocontrast(gray)
-    threshold = 140
-    bw = gray.point(lambda x: 255 if x > threshold else 0, mode='1')
-    bw = bw.filter(ImageFilter.MedianFilter(size=3))
-    if bw.width < 300:
-        new_size = (bw.width * 2, bw.height * 2)
-        bw = bw.resize(new_size, Image.Resampling.LANCZOS)
-    return bw
 
 def generate_quiz(text, min_questions=5):
     if question_gen_pipeline:
@@ -142,10 +151,26 @@ def answers_to_text(quiz_questions):
         output.write(f"Q{i}: {chr(65+correct_idx)}. {q['answer']}\n")
     return output.getvalue()
 
+def answer_question(question: str, context: str) -> str:
+    try:
+        inputs = qa_tokenizer.encode_plus(question, context, return_tensors="pt", truncation=True, max_length=512).to(device)
+        with torch.no_grad():
+            outputs = qa_model(**inputs)
+        answer_start = torch.argmax(outputs.start_logits)
+        answer_end = torch.argmax(outputs.end_logits) + 1
+        answer = qa_tokenizer.convert_tokens_to_string(qa_tokenizer.convert_ids_to_tokens(inputs["input_ids"][0][answer_start:answer_end]))
+        if answer.strip() == "":
+            return "Sorry, I couldn't find an answer in the given text."
+        return answer
+    except Exception as e:
+        logger.warning(f"QA failed: {e}")
+        return "Sorry, I couldn't answer the question. Try rephrasing or simplifying it."
+
 # Initialize session state keys
 def init_session_states():
     keys = [
-        'mode', 'sum_text', 'sum_summary', 'quiz_questions', 'image_text'
+        'mode', 'sum_text', 'sum_summary', 'quiz_questions', 
+        'qa_context', 'qa_question', 'qa_answer'
     ]
     for key in keys:
         if key not in st.session_state:
@@ -158,14 +183,22 @@ def main():
     st.title("Intelligent Text Processor with Quiz Generation")
     init_session_states()
 
-    mode = st.selectbox("Choose an option:", ["Summarization", "Image Upload"],
-                        index=["Summarization", "Image Upload"].index(st.session_state.mode))
+    mode = st.selectbox("Choose an option:", ["Summarization", "Prompt Q&A"],
+                        index=["Summarization", "Prompt Q&A"].index(st.session_state.mode))
 
     if mode != st.session_state.mode:
         st.session_state.mode = mode
 
     if mode == "Summarization":
         st.header("Summarization")
+
+        # File uploader - if uploaded, overwrite text area content
+        uploaded_file = st.file_uploader("Upload a text file (optional):", type=["txt"])
+        if uploaded_file is not None:
+            file_text = uploaded_file.read().decode("utf-8")
+            st.session_state.sum_text = file_text
+
+        # Text area - user can edit or input text directly
         text = st.text_area("Enter the paragraph to summarize:", value=st.session_state.sum_text, height=200)
         st.session_state.sum_text = text
 
@@ -209,18 +242,25 @@ def main():
             else:
                 st.warning("Please enter a paragraph to generate a quiz.")
 
-    elif mode == "Image Upload":
-        st.header("Image Upload and Text Extraction")
-        uploaded_image = st.file_uploader("Upload an image:", type=["png", "jpg", "jpeg"])
-        if uploaded_image is not None:
-            image = Image.open(uploaded_image)
-            st.image(image, caption="Uploaded Image", use_container_width=True)
-            text = extract_text_from_image(image)
-            st.session_state.image_text = text
+    elif mode == "Prompt Q&A":
+        st.header("Prompt Q&A")
+        context = st.text_area("Enter context:", value=st.session_state.qa_context, height=200)
+        st.session_state.qa_context = context
 
-        if st.session_state.image_text:
-            st.subheader("Extracted Text:")
-            st.write(st.session_state.image_text)
+        question = st.text_input("Enter your question:", value=st.session_state.qa_question)
+        st.session_state.qa_question = question
+
+        if st.button("Get Answer"):
+            if context.strip() and question.strip():
+                answer = answer_question(question, context)
+                st.session_state.qa_answer = answer
+            else:
+                st.warning("Please provide both context and a question.")
+
+        if st.session_state.qa_answer:
+            st.subheader("Answer:")
+            st.write(st.session_state.qa_answer)
+
 
 if __name__ == "__main__":
     main()

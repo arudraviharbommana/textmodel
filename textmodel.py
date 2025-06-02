@@ -8,11 +8,8 @@ from transformers import (
 import re
 import logging
 import streamlit as st
-from PIL import Image, ImageFilter, ImageOps
-import pytesseract
 import random
 import io
-import tempfile
 
 # Setup logging
 logging.basicConfig(level=logging.INFO)
@@ -51,28 +48,6 @@ def clean_text(text: str) -> str:
 def summarize(text: str) -> str:
     try:
         input_text = "summarize: " + clean_text(text)
-        # Calculate the desired length for the summary
-        max_length = max(1, len(text.split()) * 2 // 5)  # Two-fifths of the input length
-        min_length = max(40, max_length // 2)  # Ensure min_length is at least half of max_length
-
-        inputs = sum_tokenizer.encode(input_text, return_tensors="pt", max_length=512, truncation=True).to(device)
-        summary_ids = sum_model.generate(
-            inputs,
-            max_length=max_length,
-            min_length=min_length,
-            length_penalty=1.5,  # Adjusted for better summary length
-            num_beams=6,  # Increased number of beams for better quality
-            early_stopping=True,
-            temperature=1.0,  # Control randomness
-            top_k=50  # Limit the sampling pool
-        )
-        return sum_tokenizer.decode(summary_ids[0], skip_special_tokens=True)
-    except Exception as e:
-        logger.warning(f"Summarization failed: {e}")
-        return "Sorry, I couldn't generate a summary. Try providing a more detailed paragraph."
-def summarize(text: str) -> str:
-    try:
-        input_text = "summarize: " + clean_text(text)
         input_tokens = sum_tokenizer.encode(input_text, return_tensors="pt", max_length=1024, truncation=True).to(device)
 
         # Calculate max and min length for summary (2/5 of input word count)
@@ -100,22 +75,6 @@ def summarize(text: str) -> str:
     except Exception as e:
         logger.warning(f"Summarization failed: {e}")
         return "Sorry, I couldn't generate a summary. Try providing a more detailed paragraph."
-
-def extract_text_from_image(image: Image.Image) -> str:
-    preprocessed = preprocess_image(image)
-    text = pytesseract.image_to_string(preprocessed)
-    return clean_text(text)
-
-def preprocess_image(image):
-    gray = image.convert("L")
-    gray = ImageOps.autocontrast(gray)
-    threshold = 140
-    bw = gray.point(lambda x: 255 if x > threshold else 0, mode='1')
-    bw = bw.filter(ImageFilter.MedianFilter(size=3))
-    if bw.width < 300:
-        new_size = (bw.width * 2, bw.height * 2)
-        bw = bw.resize(new_size, Image.Resampling.LANCZOS)
-    return bw
 
 def generate_quiz(text, min_questions=5):
     if question_gen_pipeline:
@@ -210,7 +169,7 @@ def answer_question(question: str, context: str) -> str:
 # Initialize session state keys
 def init_session_states():
     keys = [
-        'mode', 'sum_text', 'sum_summary', 'quiz_questions', 'image_text',
+        'mode', 'sum_text', 'sum_summary', 'quiz_questions', 
         'qa_context', 'qa_question', 'qa_answer'
     ]
     for key in keys:
@@ -224,8 +183,8 @@ def main():
     st.title("Intelligent Text Processor with Quiz Generation")
     init_session_states()
 
-    mode = st.selectbox("Choose an option:", ["Summarization", "Image Upload", "Prompt Q&A"],
-                        index=["Summarization", "Image Upload", "Prompt Q&A"].index(st.session_state.mode))
+    mode = st.selectbox("Choose an option:", ["Summarization", "Prompt Q&A"],
+                        index=["Summarization", "Prompt Q&A"].index(st.session_state.mode))
 
     if mode != st.session_state.mode:
         st.session_state.mode = mode
@@ -274,19 +233,6 @@ def main():
                 )
             else:
                 st.warning("Please enter a paragraph to generate a quiz.")
-
-    elif mode == "Image Upload":
-        st.header("Image Upload and Text Extraction")
-        uploaded_image = st.file_uploader("Upload an image:", type=["png", "jpg", "jpeg"])
-        if uploaded_image is not None:
-            image = Image.open(uploaded_image)
-            st.image(image, caption="Uploaded Image", use_container_width=True)
-            text = extract_text_from_image(image)
-            st.session_state.image_text = text
-
-        if st.session_state.image_text:
-            st.subheader("Extracted Text:")
-            st.write(st.session_state.image_text)
 
     elif mode == "Prompt Q&A":
         st.header("Prompt Q&A")
