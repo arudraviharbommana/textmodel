@@ -12,7 +12,6 @@ import random
 import re
 
 app = FastAPI()
-
 # Load models and tokenizers once when server starts
 sum_model_name = "t5-small"
 sum_tokenizer = AutoTokenizer.from_pretrained(sum_model_name)
