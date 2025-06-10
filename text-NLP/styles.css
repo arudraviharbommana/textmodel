@@ -1,155 +1,24 @@
-/* Body and container */
-body, .main {
-    background-color: #ffffff !important;
-    color: #6b7280 !important;
-    font-family: 'Inter', sans-serif;
-}
-
-.container {
-    max-width: 1200px;
-    margin: 0 auto;
-    padding-left: 1rem;
-    padding-right: 1rem;
-}
-
-/* Sticky Header */
-.header {
-    position: sticky;
-    top: 0;
-    background: #ffffff;
-    z-index: 9999;
-    padding: 1rem 0;
-    box-shadow: 0 2px 5px rgb(0 0 0 / 0.05);
-    font-weight: 700;
-    font-size: 1.5rem;
-    color: #111827;
-}
-
-.header-container {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-}
-
-/* Navigation buttons */
-nav .nav-btn {
-    border: none;
-    background: none;
-    font-weight: 600;
-    font-size: 1rem;
-    cursor: pointer;
-    color: #6b7280;
-    margin-left: 2rem;
-    padding: 0.25rem 0.5rem;
-    border-radius: 0.5rem;
-    transition: all 0.3s ease;
-}
-
-nav .nav-btn:hover {
-    color: #111827;
-    background-color: #f3f4f6;
-}
-
-nav .nav-btn.active {
-    color: #111827;
-    border-bottom: 2px solid #111827;
-}
-
-/* Headings */
-h1 {
-    font-weight: 800 !important;
-    font-size: 48px !important;
-    color: #111827 !important;
-    margin-bottom: 0.25em !important;
-}
-
-h2 {
-    font-weight: 700 !important;
-    font-size: 28px !important;
-    color: #374151 !important;
-    margin-top: 3rem !important;
-    margin-bottom: 1rem !important;
-}
-
-/* Textarea, inputs, selects */
-textarea, input[type="text"], select {
-    font-size: 16px !important;
-    padding: 12px !important;
-    border-radius: 0.75rem !important;
-    border: 1px solid #d1d5db !important;
-    color: #374151 !important;
-    resize: vertical;
-    width: 100%;
-    box-sizing: border-box;
-    margin-bottom: 1rem !important;
-}
-
-/* Buttons */
-button[kind="primary"], button.streamlit-expanderHeader {
-    background-color: #111827 !important;
-    color: #fff !important;
-    font-weight: 700 !important;
-    padding: 0.75rem 1.5rem !important;
-    border-radius: 0.75rem !important;
-    border: none;
-    cursor: pointer;
-    transition: background-color 0.25s ease;
-    margin-top: 1rem !important;
-    margin-bottom: 1rem !important;
-}
-
-button[kind="primary"]:hover, button.streamlit-expanderHeader:hover {
-    background-color: #1f2937 !important;
-    color: #f9fafb !important;
-}
-
-/* Cards */
 .card {
-    background: #f9fafb;
-    padding: 1.5rem 2rem;
-    border-radius: 0.75rem;
-    margin-bottom: 2rem;
-    box-shadow: 0 1px 6px rgb(0 0 0 / 0.05);
-    color: #374151;
-    white-space: pre-wrap;
+    background: #f8f9fa;
+    border-radius: 8px;
+    padding: 16px;
+    margin-bottom: 16px;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.04);
 }
-
-/* Specialized card types */
 .summary {
-    font-size: 1rem;
-    line-height: 1.6;
+    font-size: 1.1em;
+    color: #222;
 }
-
 .question-block {
-    font-weight: 700;
-    font-size: 1.15rem;
-    margin-bottom: 0.75rem;
-    color: #111827;
+    font-weight: bold;
+    margin-bottom: 8px;
 }
-
-.options-block div {
-    margin-left: 1.5rem;
-    margin-bottom: 0.3rem;
-    color: #4b5563;
-    font-weight: 500;
-    cursor: pointer;
-    transition: color 0.2s ease;
-    border-radius: 0.5rem;
-    padding: 0.3rem 0.75rem;
+.options-block {
+    margin-left: 16px;
+    margin-bottom: 16px;
 }
-
-.options-block div:hover {
-    color: #111827;
-    background-color: #f3f4f6;
-    font-weight: 700;
-}
-
 .answer-block {
-    font-weight: 700;
-    font-size: 1rem;
-    background-color: #e0f2fe;
-    padding: 1rem 1.5rem;
-    border-radius: 0.75rem;
-    color: #0369a1;
+    color: #155724;
+    background: #d4edda;
+    border: 1px solid #c3e6cb;
 }
-

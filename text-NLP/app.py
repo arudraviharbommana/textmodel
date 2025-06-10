@@ -4,6 +4,7 @@ from nlp import (
     summarize_with_bart,
     generate_questions_t5,
     answer_question,
+    generate_questions_nltk,  # Add fallback import if you implement it
 )
 
 def init_session_states():
@@ -23,6 +24,8 @@ def init_session_states():
                 st.session_state[key] = "Summarization"
             elif key == "summary_type":
                 st.session_state[key] = "Short Summary"
+            elif key == "quiz_questions":
+                st.session_state[key] = []
             else:
                 st.session_state[key] = ""
 
@@ -47,8 +50,11 @@ def main():
     init_session_states()
 
     # Load CSS styles
-    with open("styles.css") as f:
-        st.markdown(f"<style>{f.read()}</style>", unsafe_allow_html=True)
+    try:
+        with open("styles.css") as f:
+            st.markdown(f"<style>{f.read()}</style>", unsafe_allow_html=True)
+    except Exception:
+        pass
 
     # Sticky Header
     st.markdown(
@@ -111,6 +117,15 @@ def main():
         )
         st.session_state.sum_text = text
 
+        # Let user choose summarization method
+        sum_method = st.radio(
+            "Summarization method:",
+            ["Abstractive (BART)", "Extractive (Gensim)"],
+            index=0,
+            help="Abstractive uses BART (LLM), Extractive uses Gensim (traditional NLP)."
+        )
+        method = "abstractive" if sum_method.startswith("Abstractive") else "extractive"
+
         summary_type = st.selectbox(
             "Summary length/type:",
             ["Short Summary", "Detailed Bullet-Point Summary"],
@@ -124,7 +139,7 @@ def main():
             if text.strip():
                 with st.spinner("Generating summary..."):
                     detailed = summary_type == "Detailed Bullet-Point Summary"
-                    summary = summarize_with_bart(text, detailed=detailed)
+                    summary = summarize_with_bart(text, detailed=detailed, method=method)
                 st.session_state.sum_summary = summary
             else:
                 st.warning("Please enter a paragraph to summarize.")
@@ -142,7 +157,11 @@ def main():
         if st.button("Generate Quiz"):
             if text.strip():
                 with st.spinner("Generating quiz questions..."):
-                    quiz_questions = generate_questions_t5(text)
+                    try:
+                        quiz_questions = generate_questions_t5(text)
+                    except Exception:
+                        st.info("T5 question generation failed, using NLTK fallback.")
+                        quiz_questions = generate_questions_nltk(text)
                 st.session_state.quiz_questions = quiz_questions
 
                 for i, q in enumerate(quiz_questions, 1):

@@ -3,3 +3,5 @@ transformers
 streamlit
 regex
 sentencepiece
+gensim==3.8.3
+nltk
