@@ -224,44 +224,93 @@ function calculateSentenceImportance(sentences: string[], fullText: string): { [
   const scores: { [sentence: string]: number } = {};
   const allWords = fullText.toLowerCase().split(/\s+/);
   const wordFreq: { [word: string]: number } = {};
+  const stopWords = new Set(['the', 'a', 'an', 'and', 'or', 'but', 'in', 'on', 'at', 'to', 'for', 'of', 'with', 'by', 'is', 'are', 'was', 'were', 'be', 'been', 'have', 'has', 'had', 'do', 'does', 'did', 'will', 'would', 'could', 'should', 'may', 'might', 'can', 'this', 'that', 'these', 'those', 'it', 'its', 'they', 'them', 'their', 'there', 'then', 'than', 'when', 'where', 'why', 'what', 'who', 'how']);
   
+  // Calculate word frequency excluding stop words
   allWords.forEach(word => {
-    if (word.length > 3) {
+    if (word.length > 3 && !stopWords.has(word)) {
       wordFreq[word] = (wordFreq[word] || 0) + 1;
     }
   });
   
+  // Find high-value terms (words that appear frequently but not too frequently)
+  const totalWords = allWords.length;
+  const importantTerms = Object.entries(wordFreq)
+    .filter(([_, freq]) => freq > 1 && freq < totalWords * 0.1) // Not too rare, not too common
+    .sort(([_, a], [__, b]) => b - a)
+    .slice(0, 20)
+    .map(([word, _]) => word);
+  
   sentences.forEach((sentence, index) => {
     let score = 0;
-    const words = sentence.toLowerCase().split(/\s+/);
+    const words = sentence.toLowerCase().split(/\s+/).filter(w => w.length > 2);
+    const sentenceLength = sentence.trim().length;
     
-    // Position scoring
-    if (index === 0) score += 3;
-    else if (index === sentences.length - 1) score += 2;
-    else if (index < sentences.length * 0.2) score += 1.5;
-    else if (index > sentences.length * 0.8) score += 1;
+    // Position scoring - more nuanced
+    const relativePosition = index / (sentences.length - 1 || 1);
+    if (index === 0) score += 4; // First sentence often introduces main ideas
+    else if (index === sentences.length - 1) score += 3; // Last sentence often concludes
+    else if (relativePosition < 0.15) score += 2.5; // Early sentences introduce concepts
+    else if (relativePosition > 0.85) score += 2; // Late sentences summarize or conclude
+    else if (relativePosition > 0.4 && relativePosition < 0.7) score += 1; // Middle sentences develop ideas
     
-    // Length scoring
+    // Length scoring - optimal length for information density
     const wordCount = words.length;
-    if (wordCount >= 8 && wordCount <= 25) score += 2;
-    else if (wordCount >= 5 && wordCount <= 35) score += 1;
+    if (wordCount >= 10 && wordCount <= 25) score += 3; // Optimal length for comprehensive info
+    else if (wordCount >= 6 && wordCount <= 35) score += 2; // Good length
+    else if (wordCount >= 4 && wordCount <= 45) score += 1; // Acceptable length
+    else if (wordCount < 4) score -= 1; // Too short, likely incomplete
+    else if (wordCount > 50) score -= 1; // Too long, likely complex
     
-    // Content scoring
-    words.forEach(word => {
-      if (word.length > 3 && wordFreq[word]) {
-        score += Math.min(wordFreq[word] * 0.1, 1);
-      }
-    });
+    // Important terms frequency
+    const importantTermsInSentence = words.filter(word => importantTerms.includes(word));
+    score += importantTermsInSentence.length * 1.5; // Boost for important terms
     
-    // Structural indicators
-    if (/\b(important|significant|key|main|primary|essential|crucial|major|critical|enables?|focuses?)\b/i.test(sentence)) score += 2;
-    if (/\b(first|second|third|finally|conclusion|result|finding|ultimately)\b/i.test(sentence)) score += 1.5;
-    if (/\b(however|therefore|consequently|furthermore|moreover|additionally)\b/i.test(sentence)) score += 1;
+    // Unique important terms (diversity bonus)
+    const uniqueImportantTerms = new Set(importantTermsInSentence);
+    score += uniqueImportantTerms.size * 0.5;
     
-    // Technical terms and definitions
-    if (/\b(?:is|are)\s+(?:a|an)?\s*[^.!?]*(?:that|which|involving|including)/i.test(sentence)) score += 1.5;
+    // Content type indicators - strong signals
+    if (/\b(therefore|consequently|as a result|this means|this indicates|this shows|this demonstrates)\b/i.test(sentence)) score += 3;
+    if (/\b(important|significant|key|main|primary|essential|crucial|major|critical|fundamental|central)\b/i.test(sentence)) score += 2.5;
+    if (/\b(enables?|allows?|provides?|offers?|creates?|establishes?|determines?|influences?)\b/i.test(sentence)) score += 2;
+    if (/\b(focuses?|emphasizes?|highlights?|addresses?|examines?|explores?|investigates?)\b/i.test(sentence)) score += 1.8;
     
-    scores[sentence] = score;
+    // Structural and logical indicators
+    if (/\b(first|second|third|next|then|finally|lastly|in conclusion|to summarize)\b/i.test(sentence)) score += 2;
+    if (/\b(however|nevertheless|nonetheless|although|despite|while|whereas|in contrast)\b/i.test(sentence)) score += 1.5;
+    if (/\b(furthermore|moreover|additionally|also|besides|in addition|similarly)\b/i.test(sentence)) score += 1.3;
+    
+    // Definition and explanation patterns
+    if (/\b(?:is|are)\s+(?:a|an|the)?\s*[^.!?]*?(?:that|which|who)\b/i.test(sentence)) score += 2.5; // Definition pattern
+    if (/\b(?:refers to|means|defined as|known as|characterized by)\b/i.test(sentence)) score += 2.5;
+    if (/\b(?:such as|for example|including|like|especially|particularly)\b/i.test(sentence)) score += 1.5;
+    
+    // Factual and analytical content
+    if (/\b(?:research|study|analysis|data|evidence|findings|results|shows?|indicates?|suggests?)\b/i.test(sentence)) score += 2;
+    if (/\b(?:according to|based on|studies show|research indicates)\b/i.test(sentence)) score += 1.8;
+    
+    // Question patterns (often important for understanding)
+    if (/\?/.test(sentence)) score += 1.5;
+    
+    // Avoid sentences that are just connective or transitional
+    if (/^(?:however|moreover|furthermore|additionally|also|besides|in addition|similarly|therefore|consequently|as a result),?\s*$/i.test(sentence.trim())) {
+      score -= 2;
+    }
+    
+    // Boost for sentences with numbers or specific data
+    if (/\b\d+(?:\.\d+)?(?:%|percent|percentage|million|billion|thousand)?\b/i.test(sentence)) score += 1;
+    
+    // Penalize very repetitive sentences
+    const wordsSet = new Set(words);
+    const uniquenessRatio = wordsSet.size / words.length;
+    if (uniquenessRatio < 0.6) score -= 1; // Penalize repetitive sentences
+    
+    // Character-based penalties and bonuses
+    if (sentenceLength < 30) score -= 0.5; // Too short sentences often lack context
+    if (sentenceLength > 300) score -= 0.5; // Too long sentences can be hard to process
+    
+    scores[sentence] = Math.max(0, score); // Ensure no negative scores
   });
   
   return scores;
@@ -271,59 +320,155 @@ function calculateSentenceImportance(sentences: string[], fullText: string): { [
 function generateAISummary(text: string, analysis: TextAnalysis, detailed: boolean): string {
   const { mainTopics, keyEntities, sentimentTone, textStructure, importanceScores, concepts, definitions } = analysis;
   
-  const topSentences = Object.entries(importanceScores)
+  // Get sentences ordered by importance, not just first few
+  const rankedSentences = Object.entries(importanceScores)
     .sort(([_, a], [__, b]) => b - a)
-    .slice(0, detailed ? 6 : 3)
-    .map(([sentence, _]) => sentence);
+    .map(([sentence, score]) => ({ sentence: sentence.trim(), score }))
+    .filter(item => item.sentence.length > 20); // Filter out very short sentences
+  
+  // Analyze text structure for better summarization
+  const paragraphs = text.split(/\n\s*\n/).filter(p => p.trim().length > 50);
+  const totalSentences = text.split(/[.!?]+/).filter(s => s.trim().length > 15).length;
   
   if (detailed) {
     const summary = [];
     
-    const mainTheme = mainTopics[0] || 'the subject matter';
-    summary.push(`**Overview**: This content explores ${mainTheme} with a ${sentimentTone} perspective`);
+    // Create intelligent overview
+    const primaryTopic = mainTopics[0] || 'various subjects';
+    const secondaryTopics = mainTopics.slice(1, 3);
     
-    summary.push('**Key Points**:');
-    topSentences.slice(0, 4).forEach(sentence => {
-      const simplified = simplifyForSummary(sentence);
-      if (simplified.length > 15) {
-        summary.push(`• ${simplified}`);
+    let overview = `**Comprehensive Analysis**: This ${totalSentences > 10 ? 'comprehensive' : 'focused'} content`;
+    
+    if (paragraphs.length > 1) {
+      overview += ` is structured across ${paragraphs.length} main sections and`;
+    }
+    
+    overview += ` examines ${primaryTopic}`;
+    
+    if (secondaryTopics.length > 0) {
+      overview += `, with additional focus on ${secondaryTopics.join(' and ')}`;
+    }
+    
+    overview += `. The content maintains a ${sentimentTone} tone throughout.`;
+    summary.push(overview);
+    
+    // Extract key insights from highest-scoring sentences
+    summary.push('\n**Core Insights**:');
+    const keyInsights = rankedSentences.slice(0, Math.min(5, Math.ceil(totalSentences / 4)));
+    
+    keyInsights.forEach((item, index) => {
+      const insight = synthesizeInsight(item.sentence, analysis);
+      if (insight && insight.length > 20) {
+        summary.push(`${index + 1}. ${insight}`);
       }
     });
     
+    // Add conceptual definitions if available
     if (Object.keys(definitions).length > 0) {
-      const keyDefinition = Object.entries(definitions)[0];
-      summary.push(`**Key Concept**: ${keyDefinition[0]} - ${keyDefinition[1]}`);
+      summary.push('\n**Key Concepts**:');
+      Object.entries(definitions).slice(0, 2).forEach(([term, definition]) => {
+        summary.push(`• **${term}**: ${definition}`);
+      });
     }
     
+    // Add important entities and their context
     if (keyEntities.length > 0) {
-      const relevantEntities = keyEntities.slice(0, 3);
-      summary.push(`**Important Elements**: ${relevantEntities.join(', ')}`);
+      const contextualEntities = keyEntities.slice(0, 4).map(entity => {
+        const context = findEntityContext(entity, text);
+        return context ? `${entity} (${context})` : entity;
+      });
+      summary.push(`\n**Key Elements**: ${contextualEntities.join(', ')}`);
+    }
+    
+    // Add structural insights for longer texts
+    if (paragraphs.length > 2) {
+      const structuralInsight = analyzeContentFlow(paragraphs, analysis);
+      if (structuralInsight) {
+        summary.push(`\n**Content Structure**: ${structuralInsight}`);
+      }
     }
     
     return summary.join('\n');
+    
   } else {
-    const mainTheme = mainTopics[0] || 'various topics';
-    const keyPoint = simplifyForSummary(topSentences[0] || '');
-    const supportingPoint = topSentences[1] ? simplifyForSummary(topSentences[1]) : '';
+    // Create concise but intelligent summary
+    const primaryTopic = mainTopics[0] || 'the subject matter';
+    const topInsights = rankedSentences.slice(0, 2);
     
-    let summary = `This content examines ${mainTheme}`;
+    let summary = `This content focuses on ${primaryTopic}`;
     
-    if (keyPoint) {
-      summary += `. ${keyPoint}`;
+    if (topInsights.length > 0) {
+      const mainInsight = synthesizeInsight(topInsights[0].sentence, analysis);
+      if (mainInsight) {
+        summary += `. ${mainInsight}`;
+      }
+      
+      if (topInsights.length > 1) {
+        const secondaryInsight = synthesizeInsight(topInsights[1].sentence, analysis);
+        if (secondaryInsight && secondaryInsight !== mainInsight) {
+          summary += ` Additionally, ${secondaryInsight.toLowerCase()}`;
+        }
+      }
     }
     
-    if (supportingPoint && supportingPoint !== keyPoint) {
-      summary += ` ${supportingPoint}`;
-    }
-    
+    // Add most important entity if relevant
     if (keyEntities.length > 0) {
-      const topEntity = keyEntities[0];
-      summary += ` Key focus includes ${topEntity}`;
+      const primaryEntity = keyEntities[0];
+      const entityContext = findEntityContext(primaryEntity, text);
+      if (entityContext && !summary.toLowerCase().includes(primaryEntity.toLowerCase())) {
+        summary += ` The discussion emphasizes ${primaryEntity}`;
+        if (entityContext.length < 100) {
+          summary += ` as ${entityContext}`;
+        }
+      }
     }
     
     summary += '.';
     return summary;
   }
+}
+
+// New function to synthesize insights from sentences
+function synthesizeInsight(sentence: string, analysis: TextAnalysis): string {
+  if (!sentence || sentence.length < 20) return '';
+  
+  // Clean and enhance the sentence for summary
+  let insight = sentence
+    .replace(/^(However|Moreover|Furthermore|Additionally|Consequently|Therefore|Thus|Hence),?\s*/i, '')
+    .replace(/\b(it is important to note that|it should be mentioned that|it is worth noting that|one should consider that)\b/gi, '')
+    .replace(/\b(this means that|this implies that|this suggests that)\b/gi, 'this indicates')
+    .replace(/\s+/g, ' ')
+    .trim();
+  
+  // Ensure insight starts with capital letter
+  if (insight.length > 0) {
+    insight = insight.charAt(0).toUpperCase() + insight.slice(1);
+  }
+  
+  // Remove redundant phrases and make more concise
+  insight = insight
+    .replace(/\b(in this context|in this regard|with respect to this)\b/gi, '')
+    .replace(/\b(it can be seen that|it can be observed that)\b/gi, '')
+    .trim();
+  
+  return insight;
+}
+
+// New function to analyze content flow
+function analyzeContentFlow(paragraphs: string[], analysis: TextAnalysis): string {
+  if (paragraphs.length < 2) return '';
+  
+  const { mainTopics } = analysis;
+  
+  if (paragraphs.length === 2) {
+    return 'The content is organized into two complementary sections that build upon each other';
+  } else if (paragraphs.length === 3) {
+    return 'The content follows a three-part structure: introduction of concepts, detailed analysis, and implications';
+  } else if (paragraphs.length > 3) {
+    return `The content is systematically organized across ${paragraphs.length} sections, providing comprehensive coverage of ${mainTopics[0] || 'the topic'}`;
+  }
+  
+  return '';
 }
 
 // Simplify sentence for summary inclusion
