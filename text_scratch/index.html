@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Text Analysis AI</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <div id="three-container"></div>
+  
+  <!-- Sidebar for History -->
+  <div id="sidebar" class="sidebar">
+    <div class="sidebar-header">
+      <h3>📚 Work History</h3>
+      <button id="toggleSidebar" class="toggle-btn">←</button>
+    </div>
+    <div class="sidebar-content">
+      <div class="history-controls">
+        <button onclick="clearHistory()" class="clear-btn">Clear All</button>
+        <button onclick="exportHistory()" class="export-btn">Export</button>
+      </div>
+      <div id="historyList" class="history-list">
+        <!-- History items will be populated here -->
+      </div>
+    </div>
+  </div>
+  
+  <main class="container">
+    <div class="header">
+      <button id="menuToggle" class="menu-toggle">☰</button>
+      <h1>📘 AI Text Analyzer</h1>
+    </div>
+    
+    <textarea id="inputText" placeholder="Paste or type your text here..."></textarea>
+    
+    <div class="buttons">
+      <button onclick="handleClick('summarize')">Summarize</button>
+      <button onclick="handleClick('keynotes')">Key Notes</button>
+      <button onclick="handleClick('explain')">Explanation</button>
+      <button onclick="handleClick('dive')">Dive Deeper</button>
+    </div>
+
+    <div id="outputBox">
+      <h2>🧠 Output</h2>
+      <p id="output"></p>
+    </div>
+
+    <div id="diveDeepBox" style="display: none;">
+      <h3>🔍 Ask About This Content</h3>
+      <div class="question-input">
+        <input type="text" id="questionInput" placeholder="Ask a question about the content above..." />
+        <button onclick="handleQuestion()">Ask</button>
+      </div>
+      <div id="questionOutput">
+        <p id="questionAnswer"></p>
+      </div>
+    </div>
+  </main>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r134/three.min.js"></script>
+  <script src="script.js"></script>
+</body>
+</html>
