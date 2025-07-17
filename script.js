@@ -394,7 +394,7 @@ function animate() {
 animate();
 
 // API Configuration
-const API_KEY = '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';
+const API_KEY = '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';
 const API_BASE_URL = 'https://openrouter.ai/api/v1/chat/completions';
 
 // Database Configuration - Supabase
@@ -944,6 +944,11 @@ Answer:`;
 
 // Generic API call function
 async function makeAPICall(prompt) {
+  // Check if API key is configured
+  if (!API_KEY || API_KEY === 'sk-or-v1-YOUR_API_KEY_HERE') {
+    throw new Error('API key not configured. Please check API_SETUP.md for instructions.');
+  }
+  
   try {
     const response = await fetch(API_BASE_URL, {
       method: 'POST',
@@ -984,6 +989,12 @@ async function makeAPICall(prompt) {
     }
   } catch (error) {
     console.error('API Error Details:', error);
+    
+    // If API fails, provide a fallback response
+    if (error.message.includes('401') || error.message.includes('auth')) {
+      throw new Error('Authentication failed. Please check your API key configuration in API_SETUP.md.');
+    }
+    
     throw error;
   }
 }
